@@ -1,0 +1,54 @@
+{
+  "name": "@letmesendemail/letmesendemail-node",
+  "version": "0.1.0",
+  "description": "letmesend.email Node.js SDK.",
+  "license": "MIT",
+  "homepage": "https://letmesend.email/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/letmesendemail/letmesendemail-node"
+  },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist/**",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsdown src/index.ts --format esm,cjs --dts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check . --write",
+    "prepublishOnly": "pnpm build"
+  },
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.3",
+    "@types/node": "^22.20.1",
+    "tsdown": "^0.22.4",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

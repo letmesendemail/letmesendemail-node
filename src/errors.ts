@@ -52,7 +52,17 @@ export function errorFromStatusCode(
   const rawBody = JSON.stringify(body);
   const requestId = headers["x-request-id"] ?? undefined;
 
-  const make = (ErrorClass: new (message: string, statusCode?: number, apiCode?: string, validationErrors?: Record<string, string[]>, requestId?: string, responseHeaders?: Record<string, string>, rawBody?: string) => LetMeSendEmailError) => {
+  const make = (
+    ErrorClass: new (
+      message: string,
+      statusCode?: number,
+      apiCode?: string,
+      validationErrors?: Record<string, string[]>,
+      requestId?: string,
+      responseHeaders?: Record<string, string>,
+      rawBody?: string,
+    ) => LetMeSendEmailError,
+  ) => {
     return new ErrorClass(message, status, apiCode, validationErrors, requestId, headers, rawBody);
   };
 
@@ -80,7 +90,19 @@ export function errorFromStatusCode(
         ? Number.parseInt(headers["x-ratelimit-remaining"], 10)
         : undefined;
       const resetAt = headers["x-ratelimit-reset"] ?? undefined;
-      return new RateLimitError(message, status, apiCode, validationErrors, requestId, headers, rawBody, retryAfter, limit, remaining, resetAt);
+      return new RateLimitError(
+        message,
+        status,
+        apiCode,
+        validationErrors,
+        requestId,
+        headers,
+        rawBody,
+        retryAfter,
+        limit,
+        remaining,
+        resetAt,
+      );
     }
     default:
       return make(ApiError);

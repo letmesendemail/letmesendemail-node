@@ -1,4 +1,8 @@
-export function mockFetch(status: number, body: unknown, headers?: Record<string, string>): () => Promise<Response> {
+export function mockFetch(
+  status: number,
+  body: unknown,
+  headers?: Record<string, string>,
+): () => Promise<Response> {
   const resHeaders = new Headers(headers ?? { "content-type": "application/json" });
   return () => Promise.resolve(new Response(JSON.stringify(body), { status, headers: resHeaders }));
 }

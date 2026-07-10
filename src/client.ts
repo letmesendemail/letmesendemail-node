@@ -1,6 +1,32 @@
 import type { LetMeSendEmailConfig } from "./config.js";
 import { resolveConfig } from "./config.js";
-import { errorFromStatusCode, NetworkError, TimeoutError } from "./errors.js";
+import {
+  errorFromStatusCode,
+  LetMeSendEmailError,
+  NetworkError,
+  RateLimitError,
+  TimeoutError,
+} from "./errors.js";
+
+const version = "0.1.0";
+
+const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+function isIdempotentMethod(method: string): boolean {
+  return method === "GET" || method === "HEAD" || method === "OPTIONS" || method === "DELETE";
+}
+
+function hasIdempotencyHeader(extraHeaders?: Record<string, string>): boolean {
+  if (!extraHeaders) return false;
+  for (const key of Object.keys(extraHeaders)) {
+    if (key.toLowerCase() === "idempotency-key") return true;
+  }
+  return false;
+}
+
+function jitter(ms: number): number {
+  return Math.floor(ms * (0.5 + Math.random() * 0.5));
+}
 
 export class HttpClient {
   private config: Required<LetMeSendEmailConfig>;
@@ -21,11 +47,58 @@ export class HttpClient {
   ): Promise<Record<string, unknown>> {
     const url = `${this.config.baseUrl.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
 
+    const mayRetry =
+      this.config.retries > 0 && (isIdempotentMethod(method) || hasIdempotencyHeader(extraHeaders));
+
+    const maxAttempts = mayRetry ? this.config.retries + 1 : 1;
+
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        const base = 100 * 2 ** (attempt - 1);
+        await new Promise((r) => setTimeout(r, jitter(base)));
+      }
+
+      try {
+        return await this.send(method, url, body, extraHeaders);
+      } catch (err: unknown) {
+        if (!mayRetry || attempt === maxAttempts - 1) throw err;
+        if (err instanceof NetworkError || err instanceof TimeoutError) continue;
+        if (err instanceof RateLimitError) {
+          const retryAfter = err.retryAfter;
+          if (retryAfter !== undefined && retryAfter > 0) {
+            await new Promise((r) => setTimeout(r, jitter(retryAfter * 1000)));
+          }
+          continue;
+        }
+        if (err instanceof LetMeSendEmailError && err.statusCode !== undefined) {
+          if (RETRYABLE_STATUSES.has(err.statusCode)) continue;
+        }
+        throw err;
+      }
+    }
+
+    throw new Error("Request failed after exhausting retries.");
+  }
+
+  private keepHeadersCase(headers: Headers): Record<string, string> {
+    const out: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      out[key] = value;
+    });
+    return out;
+  }
+
+  private async send(
+    method: string,
+    url: string,
+    body?: Record<string, unknown>,
+    extraHeaders?: Record<string, string>,
+  ): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.config.apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": `@letmesendemail/letmesendemail-node/${"0.1.0"}`,
+      "User-Agent": `@letmesendemail/letmesendemail-node/${version}`,
       ...extraHeaders,
     };
 
@@ -49,20 +122,19 @@ export class HttpClient {
       throw new NetworkError(err instanceof Error ? err.message : "Network error");
     }
 
-    const responseHeaders: Record<string, string> = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key.toLowerCase()] = value;
-    });
+    const responseHeaders = this.keepHeadersCase(response.headers);
+
+    const rawBody = await response.text();
 
     let responseBody: Record<string, unknown>;
     try {
-      responseBody = (await response.json()) as Record<string, unknown>;
+      responseBody = JSON.parse(rawBody) as Record<string, unknown>;
     } catch {
       responseBody = {};
     }
 
     if (response.status >= 400) {
-      throw errorFromStatusCode(response.status, responseBody, responseHeaders);
+      throw errorFromStatusCode(response.status, responseBody, responseHeaders, rawBody);
     }
 
     return responseBody;

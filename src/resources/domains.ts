@@ -1,4 +1,5 @@
 import type { HttpClient } from "../client.js";
+import { normalizeDomainItem, normalizePagination, normalizeStatus } from "../normalize.js";
 import type { DomainItem, DomainListResponse, StatusResponse } from "../types.js";
 
 export class DomainsResource {
@@ -16,7 +17,7 @@ export class DomainsResource {
     const data = await this.http.request("GET", path);
     return {
       data: (data.data as Record<string, unknown>[]).map(normalizeDomainItem),
-      pagination: data.pagination as DomainListResponse["pagination"],
+      pagination: normalizePagination(data.pagination as Record<string, unknown>),
     };
   }
 
@@ -27,15 +28,6 @@ export class DomainsResource {
 
   async verify(domain: string): Promise<StatusResponse> {
     const data = await this.http.request("POST", "/domains/verify", { domain });
-    return { status: data.status as string };
+    return normalizeStatus(data);
   }
-}
-
-function normalizeDomainItem(item: Record<string, unknown>): DomainItem {
-  return {
-    id: item.id as string,
-    domainName: item.domain_name as string,
-    status: item.status as string,
-    createdAt: item.created_at as string,
-  };
 }

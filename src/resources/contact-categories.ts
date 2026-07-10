@@ -1,4 +1,9 @@
 import type { HttpClient } from "../client.js";
+import {
+  normalizeContactCategoryItem,
+  normalizePagination,
+  normalizeStatus,
+} from "../normalize.js";
 import type { ContactCategoryItem, ContactCategoryListResponse, StatusResponse } from "../types.js";
 
 export class ContactCategoriesResource {
@@ -8,7 +13,7 @@ export class ContactCategoriesResource {
     const body: Record<string, unknown> = { name };
     if (slug !== undefined) body.slug = slug;
     const data = await this.http.request("POST", "/contact-categories", body);
-    return normalizeCategoryItem(data);
+    return normalizeContactCategoryItem(data);
   }
 
   async list(
@@ -26,33 +31,25 @@ export class ContactCategoriesResource {
 
     const data = await this.http.request("GET", path);
     return {
-      data: (data.data as Record<string, unknown>[]).map(normalizeCategoryItem),
-      pagination: data.pagination as ContactCategoryListResponse["pagination"],
+      data: (data.data as Record<string, unknown>[]).map(normalizeContactCategoryItem),
+      pagination: normalizePagination(data.pagination as Record<string, unknown>),
     };
   }
 
   async get(id: string): Promise<ContactCategoryItem> {
     const data = await this.http.request("GET", `/contact-categories/${id}`);
-    return normalizeCategoryItem(data);
+    return normalizeContactCategoryItem(data);
   }
 
   async update(id: string, name: string, slug?: string): Promise<ContactCategoryItem> {
     const body: Record<string, unknown> = { name };
     if (slug !== undefined) body.slug = slug;
     const data = await this.http.request("PUT", `/contact-categories/${id}`, body);
-    return normalizeCategoryItem(data);
+    return normalizeContactCategoryItem(data);
   }
 
   async delete(id: string): Promise<StatusResponse> {
     const data = await this.http.request("DELETE", `/contact-categories/${id}`);
-    return { status: data.status as string, message: data.message as string | undefined };
+    return normalizeStatus(data);
   }
-}
-
-function normalizeCategoryItem(item: Record<string, unknown>): ContactCategoryItem {
-  return {
-    id: item.id as string,
-    name: item.name as string,
-    slug: item.slug as string,
-  };
 }

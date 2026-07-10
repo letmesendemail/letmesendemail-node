@@ -1,4 +1,5 @@
 import type { HttpClient } from "../client.js";
+import { normalizeContactItem, normalizePagination, normalizeStatus } from "../normalize.js";
 import type {
   ContactItem,
   ContactListResponse,
@@ -36,7 +37,7 @@ export class ContactsResource {
     const data = await this.http.request("GET", path);
     return {
       data: (data.data as Record<string, unknown>[]).map(normalizeContactItem),
-      pagination: data.pagination as ContactListResponse["pagination"],
+      pagination: normalizePagination(data.pagination as Record<string, unknown>),
     };
   }
 
@@ -45,7 +46,10 @@ export class ContactsResource {
     return normalizeContactItem(data);
   }
 
-  async update(id: string, req: UpdateContactRequest): Promise<ContactItem> {
+  /**
+   * The update endpoint returns only `{ id }`. Returns a minimal object.
+   */
+  async update(id: string, req: UpdateContactRequest): Promise<{ id: string }> {
     const body: Record<string, unknown> = {};
     if (req.firstName !== undefined) body.first_name = req.firstName;
     if (req.lastName !== undefined) body.last_name = req.lastName;
@@ -58,24 +62,11 @@ export class ContactsResource {
     if (req.syncEmailTopics !== undefined) body.sync_email_topics = req.syncEmailTopics;
 
     const data = await this.http.request("PUT", `/contacts/${id}`, body);
-    return normalizeContactItem(data);
+    return { id: data.id as string };
   }
 
   async delete(id: string): Promise<StatusResponse> {
     const data = await this.http.request("DELETE", `/contacts/${id}`);
-    return { status: data.status as string };
+    return normalizeStatus(data);
   }
-}
-
-function normalizeContactItem(item: Record<string, unknown>): ContactItem {
-  return {
-    id: item.id as string,
-    email: item.email as string,
-    firstName: (item.first_name as string) ?? null,
-    lastName: (item.last_name as string) ?? null,
-    phone: (item.phone as string) ?? null,
-    isGloballyUnsubscribed: (item.is_globally_unsubscribed as boolean) ?? false,
-    createdAt: item.created_at as string,
-    categories: item.categories as ContactItem["categories"],
-  };
 }

@@ -45,11 +45,12 @@ export function errorFromStatusCode(
   status: number,
   body: Record<string, unknown>,
   headers: Record<string, string>,
+  rawBodyText?: string,
 ): LetMeSendEmailError {
   const message = (body.message as string) ?? "Unknown error.";
   const apiCode = (body.name as string) ?? undefined;
   const validationErrors = (body.errors as Record<string, string[]>) ?? undefined;
-  const rawBody = JSON.stringify(body);
+  const rawBody = rawBodyText ?? JSON.stringify(body);
   const requestId = headers["x-request-id"] ?? undefined;
 
   const make = (

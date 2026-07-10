@@ -30,7 +30,8 @@
   "files": [
     "dist/**",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "tsdown src/index.ts --format esm,cjs --dts",
@@ -38,8 +39,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "pnpm build"
   },
+  "packageManager": "pnpm@10.0.0",
   "engines": {
     "node": ">=20"
   },

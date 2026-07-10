@@ -22,7 +22,7 @@ export interface SendEmailRequest {
   cc?: string[];
   bcc?: string[];
   headers?: Record<string, string>;
-  attachments?: Attachment[];
+  attachments?: SendAttachment[];
   idempotencyKey?: string;
 }
 
@@ -39,17 +39,21 @@ export interface SendWithTemplateRequest {
   cc?: string[];
   bcc?: string[];
   headers?: Record<string, string>;
-  attachments?: Attachment[];
+  attachments?: SendAttachment[];
   idempotencyKey?: string;
 }
 
-export interface Attachment {
-  type?: string;
+/**
+ * Request attachment. Provide either `path` (a URL) or `content` (base64 data).
+ * `name` is required. `mime` is recommended but not strictly required by the API.
+ */
+export interface SendAttachment {
   name: string;
-  mime: string;
+  path?: string;
+  content?: string;
+  mime?: string;
   contentId?: string;
   contentDisposition?: string;
-  downloadUrl?: string;
 }
 
 export interface TemplateVariable {

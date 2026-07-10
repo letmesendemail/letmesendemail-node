@@ -1,4 +1,5 @@
 import type { HttpClient } from "../client.js";
+import { normalizeEmailTopicItem, normalizePagination, normalizeStatus } from "../normalize.js";
 import type {
   CreateEmailTopicRequest,
   EmailTopicItem,
@@ -11,10 +12,7 @@ export class EmailTopicsResource {
   constructor(private http: HttpClient) {}
 
   async create(req: CreateEmailTopicRequest): Promise<EmailTopicItem> {
-    const body: Record<string, unknown> = {
-      name: req.name,
-      slug: req.slug,
-    };
+    const body: Record<string, unknown> = { name: req.name, slug: req.slug };
     if (req.autoSubscribe !== undefined) body.auto_subscribe = req.autoSubscribe;
     if (req.public !== undefined) body.public = req.public;
     if (req.description !== undefined) body.description = req.description;
@@ -36,7 +34,7 @@ export class EmailTopicsResource {
     const data = await this.http.request("GET", path);
     return {
       data: (data.data as Record<string, unknown>[]).map(normalizeEmailTopicItem),
-      pagination: data.pagination as EmailTopicListResponse["pagination"],
+      pagination: normalizePagination(data.pagination as Record<string, unknown>),
     };
   }
 
@@ -59,22 +57,6 @@ export class EmailTopicsResource {
 
   async delete(id: string): Promise<StatusResponse> {
     const data = await this.http.request("DELETE", `/email-topics/${id}`);
-    return {
-      status: data.status as string,
-      message: data.message as string | undefined,
-    };
+    return normalizeStatus(data);
   }
-}
-
-function normalizeEmailTopicItem(item: Record<string, unknown>): EmailTopicItem {
-  return {
-    id: item.id as string,
-    name: item.name as string,
-    slug: item.slug as string,
-    description: (item.description as string) ?? null,
-    autoSubscribe: (item.auto_subscribe as boolean) ?? false,
-    public: (item.public as boolean) ?? false,
-    createdAt: item.created_at as string,
-    domain: item.domain as EmailTopicItem["domain"],
-  };
 }

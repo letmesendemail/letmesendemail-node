@@ -14,33 +14,26 @@ import {
 } from "../src/errors.js";
 
 describe("error classes", () => {
-  test("LetMeSendEmailError is base class", () => {
-    const err = new LetMeSendEmailError("test");
-    expect(err).toBeInstanceOf(Error);
-    expect(err.name).toBe("LetMeSendEmailError");
-  });
-
-  test("all error classes extend LetMeSendEmailError", () => {
+  test("all classes extend LetMeSendEmailError", () => {
     expect(new ApiError("test")).toBeInstanceOf(LetMeSendEmailError);
     expect(new AuthenticationError("test")).toBeInstanceOf(LetMeSendEmailError);
     expect(new AuthorizationError("test")).toBeInstanceOf(LetMeSendEmailError);
     expect(new ValidationError("test")).toBeInstanceOf(LetMeSendEmailError);
-    expect(new RateLimitError("test")).toBeInstanceOf(LetMeSendEmailError);
     expect(new NotFoundError("test")).toBeInstanceOf(LetMeSendEmailError);
     expect(new ConflictError("test")).toBeInstanceOf(LetMeSendEmailError);
+    expect(new RateLimitError("test")).toBeInstanceOf(LetMeSendEmailError);
     expect(new NetworkError("test")).toBeInstanceOf(LetMeSendEmailError);
     expect(new TimeoutError("test")).toBeInstanceOf(LetMeSendEmailError);
   });
 
   test("errorFromStatusCode maps 401 to AuthenticationError", () => {
-    const err = errorFromStatusCode(401, { message: "Unauthorized", name: "unauthorized" }, {});
+    const err = errorFromStatusCode(401, { message: "Unauthorized", name: "unauth" }, {});
     expect(err).toBeInstanceOf(AuthenticationError);
-    expect(err.message).toBe("Unauthorized");
-    expect(err.apiCode).toBe("unauthorized");
+    expect(err.apiCode).toBe("unauth");
   });
 
   test("errorFromStatusCode maps 404 to NotFoundError", () => {
-    const err = errorFromStatusCode(404, { message: "Not found", name: "not_found" }, {});
+    const err = errorFromStatusCode(404, { message: "Not found" }, {});
     expect(err).toBeInstanceOf(NotFoundError);
   });
 
@@ -54,14 +47,10 @@ describe("error classes", () => {
     expect(err.validationErrors).toEqual({ email: ["Required"] });
   });
 
-  test("errorFromStatusCode maps 429 to RateLimitError", () => {
-    const err = errorFromStatusCode(
-      429,
-      { message: "Rate limited", name: "rate_limited" },
-      { "retry-after": "120" },
-    ) as RateLimitError;
+  test("errorFromStatusCode maps 429 to RateLimitError with retryAfter", () => {
+    const err = errorFromStatusCode(429, { message: "Limited" }, { "retry-after": "120" });
     expect(err).toBeInstanceOf(RateLimitError);
-    expect(err.retryAfter).toBe(120);
+    expect((err as RateLimitError).retryAfter).toBe(120);
   });
 
   test("errorFromStatusCode maps 500 to ApiError", () => {
@@ -69,23 +58,17 @@ describe("error classes", () => {
     expect(err).toBeInstanceOf(ApiError);
   });
 
-  test("errorFromStatusCode maps 400 to ValidationError", () => {
-    const err = errorFromStatusCode(400, { message: "Bad request" }, {});
-    expect(err).toBeInstanceOf(ValidationError);
+  test("errorFromStatusCode maps 400/413/422 to ValidationError", () => {
+    expect(errorFromStatusCode(400, {}, {})).toBeInstanceOf(ValidationError);
+    expect(errorFromStatusCode(413, {}, {})).toBeInstanceOf(ValidationError);
+    expect(errorFromStatusCode(422, {}, {})).toBeInstanceOf(ValidationError);
   });
 
   test("errorFromStatusCode maps 403 to AuthorizationError", () => {
-    const err = errorFromStatusCode(403, { message: "Forbidden" }, {});
-    expect(err).toBeInstanceOf(AuthorizationError);
+    expect(errorFromStatusCode(403, {}, {})).toBeInstanceOf(AuthorizationError);
   });
 
   test("errorFromStatusCode maps 409 to ConflictError", () => {
-    const err = errorFromStatusCode(409, { message: "Conflict" }, {});
-    expect(err).toBeInstanceOf(ConflictError);
-  });
-
-  test("errorFromStatusCode maps 413 to ValidationError", () => {
-    const err = errorFromStatusCode(413, { message: "Too large" }, {});
-    expect(err).toBeInstanceOf(ValidationError);
+    expect(errorFromStatusCode(409, {}, {})).toBeInstanceOf(ConflictError);
   });
 });

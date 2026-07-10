@@ -8,7 +8,7 @@ import {
   TimeoutError,
 } from "./errors.js";
 
-const version = "0.1.0";
+const version = "0.2.0";
 
 const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 

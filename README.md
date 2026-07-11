@@ -1,4 +1,7 @@
 # letmesend.email Node.js SDK
+[![npm Downloads](https://img.shields.io/npm/dm/@letmesendemail/letmesendemail-node?style=for-the-badge&labelColor=000000)](https://www.npmjs.com/package/@letmesendemail/letmesendemail-node)
+[![npm Version](https://img.shields.io/npm/v/@letmesendemail/letmesendemail-node?style=for-the-badge&labelColor=000000)](https://www.npmjs.com/package/@letmesendemail/letmesendemail-node)
+[![License](https://img.shields.io/github/license/letmesendemail/letmesendemail-node?color=9cf&style=for-the-badge&labelColor=000000&cache=v1)](LICENSE.md)
 
 The official Node.js SDK for the [letmesend.email](https://letmesend.email/) API.
 

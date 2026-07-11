@@ -34,12 +34,13 @@
     "LICENSE"
   ],
   "scripts": {
+    "prebuild": "node scripts/prebuild.mjs",
     "build": "tsdown src/index.ts --format esm,cjs --dts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
-    "prepublishOnly": "pnpm build"
+    "prepublishOnly": "pnpm prebuild && pnpm build"
   },
   "packageManager": "pnpm@10.0.0",
   "engines": {

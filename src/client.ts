@@ -1,16 +1,16 @@
 import type { LetMeSendEmailConfig } from "./config.js";
-import { resolveConfig } from "./config.js";
+import { MAX_RETRY_DELAY, resolveConfig } from "./config.js";
 import {
+  ApiError,
   errorFromStatusCode,
   LetMeSendEmailError,
   NetworkError,
   RateLimitError,
   TimeoutError,
 } from "./errors.js";
+import { SDK_VERSION } from "./version.js";
 
-const version = "0.2.0";
-
-const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const RETRYABLE_STATUSES = new Set([408, 500, 502, 503, 504]);
 
 function isIdempotentMethod(method: string): boolean {
   return method === "GET" || method === "HEAD" || method === "OPTIONS" || method === "DELETE";
@@ -53,31 +53,44 @@ export class HttpClient {
     const maxAttempts = mayRetry ? this.config.retries + 1 : 1;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      if (attempt > 0) {
-        const base = 100 * 2 ** (attempt - 1);
-        await new Promise((r) => setTimeout(r, jitter(base)));
-      }
-
       try {
         return await this.send(method, url, body, extraHeaders);
       } catch (err: unknown) {
         if (!mayRetry || attempt === maxAttempts - 1) throw err;
-        if (err instanceof NetworkError || err instanceof TimeoutError) continue;
-        if (err instanceof RateLimitError) {
-          const retryAfter = err.retryAfter;
-          if (retryAfter !== undefined && retryAfter > 0) {
-            await new Promise((r) => setTimeout(r, jitter(retryAfter * 1000)));
-          }
-          continue;
+
+        const delayMs = this.computeDelay(err, attempt);
+        if (delayMs === null) throw err;
+        if (delayMs > 0) {
+          await new Promise((r) => setTimeout(r, delayMs));
         }
-        if (err instanceof LetMeSendEmailError && err.statusCode !== undefined) {
-          if (RETRYABLE_STATUSES.has(err.statusCode)) continue;
-        }
-        throw err;
       }
     }
 
     throw new Error("Request failed after exhausting retries.");
+  }
+
+  private computeDelay(err: unknown, attempt: number): number | null {
+    if (err instanceof NetworkError || err instanceof TimeoutError) {
+      const base = 100 * 2 ** attempt;
+      return Math.min(jitter(base), MAX_RETRY_DELAY * 1000);
+    }
+
+    if (err instanceof RateLimitError) {
+      const retryAfter = err.retryAfter;
+      if (retryAfter === undefined || retryAfter <= 0) return null;
+      if (retryAfter > MAX_RETRY_DELAY) return null;
+      return retryAfter * 1000;
+    }
+
+    if (err instanceof LetMeSendEmailError && err.statusCode !== undefined) {
+      if (err.statusCode === 429) return null;
+      if (RETRYABLE_STATUSES.has(err.statusCode)) {
+        const base = 100 * 2 ** attempt;
+        return Math.min(jitter(base), MAX_RETRY_DELAY * 1000);
+      }
+    }
+
+    return null;
   }
 
   private keepHeadersCase(headers: Headers): Record<string, string> {
@@ -98,7 +111,7 @@ export class HttpClient {
       Authorization: `Bearer ${this.config.apiKey}`,
       "Content-Type": "application/json",
       Accept: "application/json",
-      "User-Agent": `@letmesendemail/letmesendemail-node/${version}`,
+      "User-Agent": `@letmesendemail/letmesendemail-node/${SDK_VERSION}`,
       ...extraHeaders,
     };
 
@@ -126,17 +139,34 @@ export class HttpClient {
 
     const rawBody = await response.text();
 
-    let responseBody: Record<string, unknown>;
+    let parsedBody: unknown;
     try {
-      responseBody = JSON.parse(rawBody) as Record<string, unknown>;
+      parsedBody = JSON.parse(rawBody);
     } catch {
-      responseBody = {};
+      parsedBody = null;
     }
 
     if (response.status >= 400) {
-      throw errorFromStatusCode(response.status, responseBody, responseHeaders, rawBody);
+      const bodyMap =
+        parsedBody && typeof parsedBody === "object" && !Array.isArray(parsedBody)
+          ? (parsedBody as Record<string, unknown>)
+          : {};
+      throw errorFromStatusCode(response.status, bodyMap, responseHeaders, rawBody);
     }
 
-    return responseBody;
+    // Malformed 2xx response: reject non-object, arrays, null
+    if (parsedBody === null || Array.isArray(parsedBody) || typeof parsedBody !== "object") {
+      throw new ApiError(
+        "Malformed response body",
+        response.status,
+        undefined,
+        undefined,
+        undefined,
+        responseHeaders,
+        rawBody,
+      );
+    }
+
+    return parsedBody as Record<string, unknown>;
   }
 }

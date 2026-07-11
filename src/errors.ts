@@ -41,6 +41,23 @@ export class TimeoutError extends LetMeSendEmailError {}
 export class WebhookVerificationError extends LetMeSendEmailError {}
 export class WebhookSigningError extends LetMeSendEmailError {}
 
+function parseRetryAfter(headers: Record<string, string>): number | undefined {
+  const raw = headers["retry-after"];
+  if (raw === undefined || raw === "") return undefined;
+
+  if (/^\d+$/.test(raw)) {
+    return Number.parseInt(raw, 10);
+  }
+
+  const timestamp = Date.parse(raw);
+  if (!Number.isNaN(timestamp)) {
+    const delay = Math.floor((timestamp - Date.now()) / 1000);
+    return delay > 0 ? delay : undefined;
+  }
+
+  return undefined;
+}
+
 export function errorFromStatusCode(
   status: number,
   body: Record<string, unknown>,
@@ -81,9 +98,7 @@ export function errorFromStatusCode(
     case 409:
       return make(ConflictError);
     case 429: {
-      const retryAfter = headers["retry-after"]
-        ? Number.parseInt(headers["retry-after"], 10)
-        : undefined;
+      const retryAfter = parseRetryAfter(headers);
       const limit = headers["x-ratelimit-limit"]
         ? Number.parseInt(headers["x-ratelimit-limit"], 10)
         : undefined;

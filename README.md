@@ -51,6 +51,25 @@ const client = new LetMeSendEmail({
 | `timeoutMs` | `30000` | Request timeout in milliseconds |
 | `retries` | `0` | Number of retry attempts |
 
+### Retry Semantics
+
+Retries happen only for idempotent operations:
+- **GET, HEAD, OPTIONS, DELETE** are always retryable.
+- **POST, PUT, PATCH** are retryable only when an `Idempotency-Key` header is present.
+
+**What is retried:**
+- `NetworkError` and `TimeoutError` — connection or timeout failures.
+- HTTP 408, 500, 502, 503, 504 — retryable server errors.
+
+**Rate-limit (429) retries:**
+- Retried only when a valid `Retry-After` header is present (delta-seconds or HTTP-date).
+- The delay respects the server-provided value without jitter (never retries earlier than requested).
+- If `Retry-After` is missing, invalid, zero, expired, or exceeds 300 seconds, the error is thrown immediately.
+
+**Backoff:**
+- Non-rate-limit retries use bounded exponential backoff with jitter (base 100ms × 2^attempt).
+- All delays are capped at 300 seconds.
+
 ## Emails
 
 ```ts
@@ -66,8 +85,23 @@ const email = await client.emails.send({
 
 console.log(email.id, email.status, email.duplicate);
 
+// With attachments
+const email2 = await client.emails.send({
+  from: "Acme <hello@acme.com>",
+  to: ["person@example.com"],
+  subject: "Report",
+  attachments: [
+    // By URL
+    { name: "report.pdf", path: "https://example.com/report.pdf" },
+    // By inline content (base64)
+    { name: "data.txt", content: "SGVsbG8=" },
+    // With content ID for embedded images
+    { name: "logo.png", content: "aW1hZ2U=", contentId: "logo-cid", contentDisposition: "inline" },
+  ],
+});
+
 // Send with template
-const email2 = await client.emails.sendWithTemplate({
+const email3 = await client.emails.sendWithTemplate({
   from: "Acme <hello@acme.com>",
   to: ["person@example.com"],
   templateId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
@@ -210,6 +244,7 @@ try {
 | 20 | Yes |
 | 22 | Yes |
 | 24 | Yes |
+| 26 | Yes |
 
 ## Testing
 

@@ -8,6 +8,7 @@ export interface LetMeSendEmailConfig {
 export const DEFAULT_BASE_URL = "https://letmesend.email/api/v1";
 export const DEFAULT_TIMEOUT_MS = 30_000;
 export const DEFAULT_RETRIES = 0;
+export const MAX_RETRY_DELAY = 300;
 
 export function resolveConfig(
   configOrKey: string | LetMeSendEmailConfig,
@@ -15,10 +16,15 @@ export function resolveConfig(
   const input: LetMeSendEmailConfig =
     typeof configOrKey === "string" ? { apiKey: configOrKey } : configOrKey;
 
+  let retries = input.retries ?? DEFAULT_RETRIES;
+  if (!Number.isInteger(retries) || retries < 0) {
+    retries = DEFAULT_RETRIES;
+  }
+
   return {
     apiKey: input.apiKey,
     baseUrl: input.baseUrl ?? DEFAULT_BASE_URL,
     timeoutMs: input.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    retries: input.retries ?? DEFAULT_RETRIES,
+    retries,
   };
 }

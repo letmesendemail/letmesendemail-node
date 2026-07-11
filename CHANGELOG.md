@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.1 — 2026-07-11
+
 - Rewrote retry logic. Sleeps exactly once between attempts. Uses bounded exponential
   backoff with jitter for network errors, timeouts, 408, 500, 502, 503, and 504.
 - 429 retries only when Retry-After is valid (delta-seconds or HTTP-date) and within

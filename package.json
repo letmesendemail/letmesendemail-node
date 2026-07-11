@@ -1,6 +1,6 @@
 {
   "name": "@letmesendemail/letmesendemail-node",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "letmesend.email Node.js SDK.",
   "license": "MIT",
   "homepage": "https://letmesend.email/",

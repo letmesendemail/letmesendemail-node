@@ -15,12 +15,23 @@ pnpm add @letmesendemail/letmesendemail-node
 yarn add @letmesendemail/letmesendemail-node
 ```
 
+## Full Documentation
+
+See the comprehensive [user manual](docs/docs.md) for complete documentation of
+every resource, configuration option, retry behavior, error handling, webhook
+verification, and detailed examples.
+
 ## Quick Start
 
 ```ts
 import { LetMeSendEmail } from "@letmesendemail/letmesendemail-node";
 
-const client = new LetMeSendEmail(process.env.LETMESENDEMAIL_API_KEY!);
+const apiKey = process.env.LETMESENDEMAIL_API_KEY;
+if (!apiKey) {
+  throw new Error("LETMESENDEMAIL_API_KEY is not set");
+}
+
+const client = new LetMeSendEmail(apiKey);
 
 const email = await client.emails.send({
   from: "Acme <hello@acme.com>",
@@ -180,13 +191,14 @@ const deleted = await client.emailTopics.delete("id");
 ## Webhooks
 
 ```ts
-import { LetMeSendEmail } from "@letmesendemail/letmesendemail-node";
+import { LetMeSendEmail, WebhookVerificationError } from "@letmesendemail/letmesendemail-node";
 
-const rawPayload = JSON.stringify({
-  event: "email.delivered",
-  data: { id: "email_123" },
-});
+const secret = process.env.LETMESENDEMAIL_WEBHOOK_SECRET;
+if (!secret) {
+  throw new Error("LETMESENDEMAIL_WEBHOOK_SECRET is not set");
+}
 
+const rawPayload = JSON.stringify({ event: "email.sent" });
 const headers: Record<string, string> = {
   "webhook-id": "msg_123",
   "webhook-log-id": "log_456",
@@ -195,10 +207,14 @@ const headers: Record<string, string> = {
 };
 
 try {
-  const event = LetMeSendEmail.verifyWebhook(rawPayload, headers, process.env.LETMESENDEMAIL_WEBHOOK_SECRET!);
-  console.log("Verified event:", event.event);
+  const event = LetMeSendEmail.verifyWebhook(rawPayload, headers, secret);
+  console.log("Verified payload:", event);
 } catch (err) {
-  console.error("Verification failed:", err);
+  if (err instanceof WebhookVerificationError) {
+    console.error("Verification failed:", err.message);
+  } else {
+    console.error("Error:", err);
+  }
 }
 ```
 
@@ -207,9 +223,23 @@ try {
 List endpoints return `data` and `pagination`:
 
 ```ts
-const list = await client.emails.list(10, "cursor_after", "cursor_before");
-console.log(list.pagination.hasMore);
-console.log(list.pagination.total);
+const list = await client.emails.list(20);
+for (const item of list.data) {
+  console.log(item.id, item.subject);
+}
+console.log(list.pagination.hasMore, list.pagination.total);
+
+// Next page using the last item's ID
+if (list.pagination.hasMore && list.data.length > 0) {
+  const lastId = list.data[list.data.length - 1].id;
+  const nextPage = await client.emails.list(20, lastId);
+}
+
+// Previous page using the first item's ID (from a page other than the first)
+if (list.data.length > 0) {
+  const firstId = list.data[0].id;
+  const prevPage = await client.emails.list(20, undefined, firstId);
+}
 ```
 
 ## Error Handling

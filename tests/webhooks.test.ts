@@ -25,33 +25,33 @@ function makeData(payload: Record<string, unknown>, secret: string, timestamp?: 
 describe("webhook verification", () => {
   test("valid signature", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "email.sent" }, secret);
-    expect(verify(data.payload, data.headers, secret)).toEqual({ event: "email.sent" });
+    const data = makeData({ sample: "value" }, secret);
+    expect(verify(data.payload, data.headers, secret)).toEqual({ sample: "value" });
   });
 
   test("whsec_ prefix", () => {
     const raw = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
     const prefixed = `whsec_${raw}`;
-    const data = makeData({ event: "test" }, prefixed);
-    expect(verify(data.payload, data.headers, prefixed)).toEqual({ event: "test" });
+    const data = makeData({ sample: "value" }, prefixed);
+    expect(verify(data.payload, data.headers, prefixed)).toEqual({ sample: "value" });
   });
 
   test("wrong secret", () => {
     const s1 = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
     const s2 = Buffer.from("fedcba9876543210fedcba9876543210", "hex").toString("base64");
-    const data = makeData({ event: "test" }, s1);
+    const data = makeData({ sample: "value" }, s1);
     expect(() => verify(data.payload, data.headers, s2)).toThrow(WebhookVerificationError);
   });
 
   test("expired timestamp", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret, Math.floor(Date.now() / 1000) - 600);
+    const data = makeData({ sample: "value" }, secret, Math.floor(Date.now() / 1000) - 600);
     expect(() => verify(data.payload, data.headers, secret)).toThrow(/too old/);
   });
 
   test("future timestamp", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret, Math.floor(Date.now() / 1000) + 600);
+    const data = makeData({ sample: "value" }, secret, Math.floor(Date.now() / 1000) + 600);
     expect(() => verify(data.payload, data.headers, secret)).toThrow(/too far/);
   });
 
@@ -76,55 +76,55 @@ describe("webhook verification", () => {
 
   test("multiple signatures", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret);
+    const data = makeData({ sample: "value" }, secret);
     data.headers["webhook-signature"] = `v1,badsig ${data.headers["webhook-signature"]}`;
-    expect(verify(data.payload, data.headers, secret)).toEqual({ event: "test" });
+    expect(verify(data.payload, data.headers, secret)).toEqual({ sample: "value" });
   });
 
   test("ignores unknown versions", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret);
+    const data = makeData({ sample: "value" }, secret);
     data.headers["webhook-signature"] = `v2,ignored ${data.headers["webhook-signature"]}`;
-    expect(verify(data.payload, data.headers, secret)).toEqual({ event: "test" });
+    expect(verify(data.payload, data.headers, secret)).toEqual({ sample: "value" });
   });
 
   test("varied header casing preserves values", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret);
+    const data = makeData({ sample: "value" }, secret);
     // Vary key casing only — values stay untouched
     const mixed: Record<string, string> = {};
     for (const [k, v] of Object.entries(data.headers)) {
       const upperKey = k.toUpperCase();
       mixed[upperKey] = v; // values unchanged
     }
-    expect(verify(data.payload, mixed, secret)).toEqual({ event: "test" });
+    expect(verify(data.payload, mixed, secret)).toEqual({ sample: "value" });
   });
 
   test("HTTP_ server-style headers", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret);
+    const data = makeData({ sample: "value" }, secret);
     const http: Record<string, string> = {};
     for (const [k, v] of Object.entries(data.headers)) {
       const httpKey = `HTTP_${k.replace(/-/g, "_").toUpperCase()}`;
       http[httpKey] = v;
     }
-    expect(verify(data.payload, http, secret)).toEqual({ event: "test" });
+    expect(verify(data.payload, http, secret)).toEqual({ sample: "value" });
   });
 
   test("Web API Headers class", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret);
+    const data = makeData({ sample: "value" }, secret);
     const h = new Headers();
     for (const [k, v] of Object.entries(data.headers)) h.set(k, v);
-    expect(verify(data.payload, h, secret)).toEqual({ event: "test" });
+    expect(verify(data.payload, h, secret)).toEqual({ sample: "value" });
   });
 
   test("array header values", () => {
     const secret = Buffer.from("0123456789abcdef0123456789abcdef", "hex").toString("base64");
-    const data = makeData({ event: "test" }, secret);
+    const data = makeData({ sample: "value" }, secret);
     const arr: Record<string, string[]> = {};
     for (const [k, v] of Object.entries(data.headers)) arr[k] = [v];
-    expect(verify(data.payload, arr, secret)).toEqual({ event: "test" });
+    expect(verify(data.payload, arr, secret)).toEqual({ sample: "value" });
   });
 
   test("malformed JSON", () => {

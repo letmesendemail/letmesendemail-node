@@ -63,10 +63,11 @@ Fix any failures before proceeding.
 # 1. Update the version in package.json (single source of truth)
 # 2. Move Unreleased entries in CHANGELOG.md to a new version section
 # 3. Commit all changes
+git add -A
 git commit -m "Release vX.Y.Z"
 
 # 4. Tag and push both master and the tag
-git tag vX.Y.Z
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
 git push origin master vX.Y.Z
 ```
 

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.2.2 — 2026-07-13
+
+- Model serialization: all public request and response models are now
+  documented as JSON-serializable via `JSON.stringify()`. Nested models,
+  lists, and pagination metadata serialize recursively. Added 27
+  serialization tests covering every public model type, field naming,
+  optional values, null preservation, defensive copy behavior, and
+  JSON compatibility.
+- Corrected webhook examples and tests to use generic verified payload data
+  instead of undocumented event names or payload fields.
+- Clarified that request objects serialize all explicitly supplied public
+  fields, while the SDK moves `idempotencyKey` to the `Idempotency-Key`
+  header and excludes it from the outbound API JSON body.
+
 ## 0.2.1 — 2026-07-11
 
 - Rewrote retry logic. Sleeps exactly once between attempts. Uses bounded exponential

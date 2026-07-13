@@ -198,25 +198,22 @@ if (!secret) {
   throw new Error("LETMESENDEMAIL_WEBHOOK_SECRET is not set");
 }
 
-const rawPayload = JSON.stringify({ event: "email.sent" });
-const headers: Record<string, string> = {
-  "webhook-id": "msg_123",
-  "webhook-log-id": "log_456",
-  "webhook-timestamp": String(Math.floor(Date.now() / 1000)),
-  "webhook-signature": "v1,<base64_hmac_sha256>",
-};
-
-try {
-  const event = LetMeSendEmail.verifyWebhook(rawPayload, headers, secret);
-  console.log("Verified payload:", event);
-} catch (err) {
-  if (err instanceof WebhookVerificationError) {
-    console.error("Verification failed:", err.message);
-  } else {
-    console.error("Error:", err);
+function handleWebhook(rawPayload: string, headers: Record<string, string>): void {
+  try {
+    const payload = LetMeSendEmail.verifyWebhook(rawPayload, headers, secret);
+    console.log("Verified payload:", payload);
+  } catch (err) {
+    if (err instanceof WebhookVerificationError) {
+      console.error("Verification failed:", err.message);
+    } else {
+      console.error("Error:", err);
+    }
   }
 }
 ```
+
+Call `handleWebhook` with the exact raw request body and the unmodified webhook
+headers. Do not parse and re-serialize the body before verification.
 
 ## Pagination
 
@@ -278,6 +275,20 @@ try {
 | 22 | Yes |
 | 24 | Yes |
 | 26 | Yes |
+
+## Model Serialization
+
+All SDK models are plain JavaScript objects and serialize directly with `JSON.stringify()`.
+
+```ts
+const email = await client.emails.get("email_abc123");
+const json = JSON.stringify(email);
+
+const record = JSON.parse(json) as Record<string, unknown>;
+// Pass record to your application's database layer.
+```
+
+See [Model Serialization and Database Storage](docs/docs.md#model-serialization-and-database-storage) in the full manual for details.
 
 ## Testing
 

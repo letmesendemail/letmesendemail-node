@@ -497,27 +497,23 @@ if (!secret) {
   throw new Error("LETMESENDEMAIL_WEBHOOK_SECRET is not set");
 }
 
-const rawPayload = JSON.stringify({ event: "email.sent" });
-const headers: Record<string, string> = {
-  "webhook-id": "msg_123",
-  "webhook-log-id": "log_456",
-  "webhook-timestamp": String(Math.floor(Date.now() / 1000)),
-  "webhook-signature": "v1,<base64_hmac_sha256>",
-};
-
-try {
-  const event = LetMeSendEmail.verifyWebhook(rawPayload, headers, secret);
-  console.log("Verified:", event);
-} catch (err) {
-  if (err instanceof WebhookVerificationError) {
-    console.error("Verification failed:", err.message);
-  } else if (err instanceof WebhookSigningError) {
-    console.error("Signing error:", err.message);
-  } else {
-    console.error("Error:", err);
+function handleWebhook(rawPayload: string, headers: Record<string, string>): void {
+  try {
+    const payload = LetMeSendEmail.verifyWebhook(rawPayload, headers, secret);
+    console.log("Verified:", payload);
+  } catch (err) {
+    if (err instanceof WebhookVerificationError) {
+      console.error("Verification failed:", err.message);
+    } else if (err instanceof WebhookSigningError) {
+      console.error("Signing error:", err.message);
+    } else {
+      console.error("Error:", err);
+    }
   }
 }
 ```
+
+Call `handleWebhook` with the exact raw request-body string and the request's unmodified webhook headers. Do not parse and re-serialize the body before verification.
 
 ### Required Headers
 
@@ -529,6 +525,88 @@ try {
 | `webhook-signature` | One or more space-separated `v1,<base64>` signatures |
 
 Headers are matched case-insensitively. The default timestamp tolerance is 300 seconds. Pass a custom `tolerance` as the fifth argument to `verifyWebhook`.
+
+## Model Serialization and Database Storage
+
+All public SDK models are plain JavaScript objects that can be serialized directly with `JSON.stringify()` and parsed back with `JSON.parse()`. Nested models, lists, and pagination metadata are included automatically.
+
+### Standard JSON Serialization
+
+```ts
+// Using the authenticated client created in Quick Start:
+const email = await client.emails.get("email_abc123");
+const json = JSON.stringify(email);
+console.log(json);
+```
+
+Field names use the SDK's camelCase convention (e.g., `emailAddress`, `createdAt`, `hasMore`).
+
+### Nested Models
+
+Nested objects like recipients, attachments, and pagination metadata are serialized recursively:
+
+```ts
+const email = await client.emails.get("email_abc123");
+const json = JSON.stringify(email, null, 2);
+// recipients: [{ emailAddress: "...", openCount: 1 }, ...]
+// attachments: [{ name: "...", size: 1234 }, ...]
+```
+
+### Lists and Pagination
+
+List responses include both the `data` array and `pagination` object:
+
+```ts
+const page = await client.emails.list(10);
+const json = JSON.stringify(page, null, 2);
+// data: [{ id: "...", subject: "..." }, ...]
+// pagination: { hasMore: true, perPage: 10, total: 100 }
+```
+
+### Database Record Preparation
+
+The serialized JSON can be stored in a database or passed to application storage code:
+
+```ts
+// Application-owned database function (SDK does not write to databases)
+async function saveRecord(table: string, record: Record<string, unknown>): Promise<void> {
+  // Application database implementation
+}
+
+const email = await client.emails.get("email_abc123");
+await saveRecord("emails", email as Record<string, unknown>);
+```
+
+For a defensive copy that can be safely mutated:
+
+```ts
+const email = await client.emails.get("email_abc123");
+const copy = JSON.parse(JSON.stringify(email));
+copy.status = "locally-modified";
+// Original email.status remains unchanged
+```
+
+### Supported Models
+
+All public request and response models are plain objects and support `JSON.stringify()`:
+
+- Request models: `SendEmailRequest`, `SendWithTemplateRequest`, `SendAttachment`, `TemplateVariable`, `CreateContactRequest`, `UpdateContactRequest`, `CreateEmailTopicRequest`, `UpdateEmailTopicRequest`
+- Response models: `SendEmailResponse`, `VerifyEmailResponse`, `ShowEmailResponse`, `EmailListItem`, `Recipient`, `EmailAttachment`, `DomainItem`, `ContactItem`, `ContactUpdateResponse`, `StatusResponse`
+- List responses: `EmailListResponse`, `DomainListResponse`, `ContactListResponse`, `ContactCategoryListResponse`, `EmailTopicListResponse`
+- Nested models: `PaginationInfo`, `ContactCategoryRef`, `ContactCategoryItem`, `EmailTopicItem`
+
+### Important Notes
+
+- Direct model serialization includes a set `idempotencyKey` because it is a
+  public request field. When the SDK sends the request, it moves that value to
+  the `Idempotency-Key` HTTP header and excludes it from the API request body.
+- `undefined` optional fields are omitted from JSON output.
+- `null` values are preserved in JSON output.
+- Boolean values (`true`/`false`) and numeric values are preserved as their native types.
+- Template variable string values serialize as strings; numeric values serialize as numbers.
+- Dates are represented as ISO 8601 strings.
+- Request attachments (`SendAttachment`) and response attachments (`EmailAttachment`) are distinct types with different available fields.
+- API keys, webhook secrets, HTTP clients, and internal SDK state are never included in serialized output.
 
 ## Testing
 
